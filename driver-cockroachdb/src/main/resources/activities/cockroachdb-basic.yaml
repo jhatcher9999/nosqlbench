@@ -1,0 +1,55 @@
+# nb -v run driver=cockroachdb yaml=cockroachdb-basic connection=todo database=todo tags=phase:rampup cycles=1M
+description: An exmaple of a basic cockroach insert and find.
+
+scenarios:
+  default:
+    - run driver=cockroachdb tags==phase:rampup cycles===TEMPLATE(rampup-cycles,1000000) threads=auto
+    - run driver=cockroachdb tags==phase:main cycles===TEMPLATE(main-cycles,1000000) threads=auto
+bindings:
+  seq_key: Mod(<<keyCount:1000000>>L); ToInt()
+  seq_value: Mod(<<valueCount:1000000000>>L); <<valueSizeDist:Hash()>>; ToString() -> String
+  rw_key: <<keyDist:Uniform(0,1000000)->long>>; ToInt()
+  rw_value: <<valDist:Uniform(0,1000000000)->int>>; <<valueSizeDist:Hash()>>; ToString() -> String
+
+blocks:
+  - name: rampup
+    tags:
+      phase: rampup
+    statements:
+      - rampup-insert: insert into <<keyspace:bank>>.<<table:banktransaction>> ( code, amount ) values ( '{seq_key}', {seq_value} );
+        params:
+        tags:
+          name: rampup-insert
+  - name: main-read
+    tags:
+      phase: main
+      type: read
+    params:
+      ratio: <<read_ratio:1>>
+    statements:
+      - main-find: |
+          {
+            find: "<<collection:keyvalue>>",
+            filter: { _id: {rw_key} }
+          }
+        params:
+          readPreference: primary
+        tags:
+          name: main-find
+  - name: main-write
+    tags:
+      phase: main
+      type: write
+    params:
+      ratio: <<write_ratio:1>>
+    statements:
+      - main-insert: |
+          {
+            insert: "<<collection:keyvalue>>",
+            documents: [ { _id: {rw_key},
+                           value: {rw_value} } ]
+          }
+        params:
+          readPreference: primary
+        tags:
+          name: main-insert

@@ -21,7 +21,7 @@ there is also a lot of code.
 
 To make a testing runtime that can be expanded according to different protocols and
 scripting requirements, modularity is absolutely essential. Thus, you will find many
-nodules, each focusing on one specific type of responsibility. The build system
+modules, each focusing on one specific type of responsibility. The build system
 bundles all the modules together into a cohesive whole using SPI and auto-discovery
 mechanisms at run-time.
 
