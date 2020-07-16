@@ -1,5 +1,6 @@
-# nb -v run driver=cockroachdb yaml=cockroachdb-basic connection=todo database=todo tags=phase:rampup cycles=1M
-description: An exmaple of a basic cockroach insert and find.
+# java -jar nb.jar -v run driver=cockroachdb workload=./driver-cockroachdb/src/main/resources/activities/cockroachdb-basic tags=phase:rampup cycles=10 connectionString=jdbc:postgresql://maxroach@localhost:26257/bank?sslmode=disable showquery=true
+# java -jar nb.jar -v run driver=cockroachdb workload=./driver-cockroachdb/src/main/resources/activities/cockroachdb-basic tags=phase:main cycles=10 connectionString=jdbc:postgresql://maxroach@localhost:26257/bank?sslmode=disable showquery=true
+description: An exmaple of a basic cockroach insert
 
 scenarios:
   default:
@@ -15,6 +16,7 @@ blocks:
   - name: rampup
     tags:
       phase: rampup
+    params:
     statements:
       - rampup-insert: insert into <<keyspace:bank>>.<<table:banktransaction>> ( code, amount ) values ( '{seq_key}', {seq_value} );
         params:
@@ -27,13 +29,8 @@ blocks:
     params:
       ratio: <<read_ratio:1>>
     statements:
-      - main-find: |
-          {
-            find: "<<collection:keyvalue>>",
-            filter: { _id: {rw_key} }
-          }
+      - main-find: SELECT id, code, amount FROM <<keyspace:bank>>.<<table:banktransaction>> WHERE code = '{rw_key}' AND amount = {rw_value};
         params:
-          readPreference: primary
         tags:
           name: main-find
   - name: main-write
@@ -43,13 +40,7 @@ blocks:
     params:
       ratio: <<write_ratio:1>>
     statements:
-      - main-insert: |
-          {
-            insert: "<<collection:keyvalue>>",
-            documents: [ { _id: {rw_key},
-                           value: {rw_value} } ]
-          }
+      - main-insert: insert into <<keyspace:bank>>.<<table:banktransaction>> ( code, amount ) values ( '{seq_key}', {seq_value} );
         params:
-          readPreference: primary
         tags:
           name: main-insert

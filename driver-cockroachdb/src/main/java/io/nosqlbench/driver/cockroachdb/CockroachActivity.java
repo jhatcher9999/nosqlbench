@@ -1,7 +1,6 @@
 package io.nosqlbench.driver.cockroachdb;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 
 import io.nosqlbench.engine.api.activityconfig.yaml.OpTemplate;
@@ -33,13 +32,11 @@ public class CockroachActivity extends SimpleActivity implements ActivityDefObse
     private final static Logger logger = LoggerFactory.getLogger(CockroachActivity.class);
 
     private String yamlLoc;
-//    private String connectionString;
-//    private String databaseName;
 
     //Cockroach-specific stuff
     private DataSource ds;
     private Connection connection;
-
+    private String connectionString;
 
     private boolean showQuery;
     private int maxTries;
@@ -64,9 +61,8 @@ public class CockroachActivity extends SimpleActivity implements ActivityDefObse
         yamlLoc = activityDef.getParams().getOptionalString("yaml", "workload")
                              .orElseThrow(() -> new IllegalArgumentException("yaml is not defined"));
 
-        //TODO: set all this stuff up
-//        connectionString = activityDef.getParams().getOptionalString("connection")
-//                                      .orElseThrow(() -> new IllegalArgumentException("connection is not defined"));
+        connectionString = activityDef.getParams().getOptionalString("connectionString")
+                                      .orElseThrow(() -> new IllegalArgumentException("connectionString is not defined"));
     }
 
     @Override
@@ -78,22 +74,68 @@ public class CockroachActivity extends SimpleActivity implements ActivityDefObse
         setDefaultsFromOpSequence(opSequence);
 
         //cockroach-specific stuff
-        //TODO: get this all from the activity params
-        //TODO: put this in some kind of connection cache or move it somewhere so that it only gets instantiated once?
         //TODO: make this handle secure connections (certs, etc.)
-        //TODO: change this to a data source that just takes a connection string
-        PGSimpleDataSource ds = new PGSimpleDataSource();
-        ds.setServerName("localhost");
-        ds.setPortNumber(26257);
-        ds.setDatabaseName("bank");
-        ds.setUser("maxroach");
-        ds.setPassword(null);
-        ds.setReWriteBatchedInserts(true);
-        ds.setApplicationName("BasicExample");
         try {
+            //expecting the connection string to look something like this:
+            //jdbc:postgresql://maxroach@localhost:26257/bank?sslmode=disable
+            Properties propertiesDefault = new Properties();
+            Properties properties = org.postgresql.Driver.parseURL(connectionString, propertiesDefault);
+
+            if (properties == null) {
+                throw new IllegalArgumentException("Illegal Postgresql JDBC connection string: " + connectionString);
+            }
+
+            String user = null;
+            PGSimpleDataSource ds = new PGSimpleDataSource();
+            Set<Map.Entry<Object, Object>> entries = properties.entrySet();
+            for(Map.Entry<Object, Object> entry : entries) {
+                if (entry.getKey().equals("PGHOST")) {
+                    String[] hostsRaw = properties.getProperty("PGHOST", "localhost").split(",");
+                    String[] hosts = new String[hostsRaw.length];
+                    for(int i = 0; i < hostsRaw.length; i++)
+                    {
+                        String hostRaw = hostsRaw[i];
+                        //the connection string parser doesn't handle user@domain syntax, so I'm manually handling here
+                        if (hostRaw.contains("@")) {
+                            String[] parts = hostRaw.split("@");
+                            if (parts.length != 2) {
+                                throw new IllegalArgumentException("Unknown element in Postgresql JDBC connection string: " + hostRaw);
+                            } else {
+                                user = parts[0];
+                                hosts[i] = parts[1];
+                            }
+                        } else {
+                            hosts[i] = hostsRaw[i];
+                        }
+                    }
+                    ds.setServerNames(hosts);
+                } else if (entry.getKey().equals("PGPORT")) {
+                    String[] portsAsString = properties.getProperty("PGPORT", "25267").split(",");
+                    int[] ports = new int[portsAsString.length];
+                    for(int i = 0; i < portsAsString.length; i++)
+                    {
+                        ports[i] = Integer.parseInt(portsAsString[i]);
+                    }
+                    ds.setPortNumbers(ports);
+                } else if (entry.getKey().equals("PGDBNAME")) {
+                    ds.setDatabaseName(properties.getProperty("PGDBNAME"));
+                } else {
+                    ds.setProperty(entry.getKey().toString(), entry.getValue().toString());
+                }
+
+            }
+            if (user != null) {
+                ds.setUser(user);
+            }
+            ds.setPassword(null);
+            ds.setReWriteBatchedInserts(true); // add `rewriteBatchedInserts=true` to pg connection string
+            ds.setApplicationName("NoSqlBench CockroachDB Driver");
+
             connection = ds.getConnection();
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
         }
 
         showQuery = activityDef.getParams().getOptionalBoolean("showquery")
@@ -149,17 +191,6 @@ public class CockroachActivity extends SimpleActivity implements ActivityDefObse
 
         return sequencer.resolve();
     }
-
-//    CockroachClient createCockroachClient(String connectionString) {
-//        CodecRegistry codecRegistry = fromRegistries(fromCodecs(new UuidCodec(UuidRepresentation.STANDARD)),
-//            CockroachClientSettings.getDefaultCodecRegistry());
-//        CockroachClientSettings settings = CockroachClientSettings.builder()
-//                                                          .applyConnectionString(new ConnectionString(connectionString))
-//                                                          .codecRegistry(codecRegistry)
-//                                                          .uuidRepresentation(UuidRepresentation.STANDARD)
-//                                                          .build();
-//        return CockroachClients.create(settings);
-//    }
 
     protected Connection getConnection() {
         return connection;

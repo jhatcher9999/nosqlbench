@@ -11,7 +11,6 @@ import java.sql.PreparedStatement;
 public class ReadyCockroachStatement {
 
     private final StringBindings bindings;
-    private PreparedStatement statement;
 
 
     public ReadyCockroachStatement(OpTemplate stmtDef) {
