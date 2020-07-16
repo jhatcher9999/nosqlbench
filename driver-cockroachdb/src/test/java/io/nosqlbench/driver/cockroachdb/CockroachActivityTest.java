@@ -21,7 +21,7 @@ public class CockroachActivityTest {
     public void setup() {
         String[] params = {
             //-v run driver=cockroachdb workload=./driver-cockroachdb/src/main/resources/activities/cockroachdb-basic tags=phase:main cycles=10 connectionString=jdbc:postgresql://maxroach@localhost:26257/bank?sslmode=disable showquery=true
-                "yaml=activities/cockroachdb-basic.yaml;alias=cockroach-rampup-unit-test",
+                "workload=activities/cockroachdb-basic.yaml",
                 "connectionString=jdbc:postgresql://maxroach@localhost:26257/bank?sslmode=disable",
         };
         activityDef = ActivityDef.parseActivityDef(String.join(";", params));

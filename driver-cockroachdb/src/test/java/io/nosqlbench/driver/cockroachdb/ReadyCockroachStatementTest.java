@@ -1,6 +1,5 @@
 package io.nosqlbench.driver.cockroachdb;
 
-import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -30,7 +29,7 @@ public class ReadyCockroachStatementTest {
     @Before
     public void setup() {
         String[] params = {
-                "yaml=activities/cockroachdb-basic.yaml",
+                "workload=activities/cockroachdb-basic.yaml",
                 "connectionString=jdbc:postgresql://maxroach@localhost:26257/bank?sslmode=disable"
         };
         activityDef = ActivityDef.parseActivityDef(String.join(";", params));
